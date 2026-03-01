@@ -2,9 +2,11 @@ name: Vavoo M3U Update
 
 on:
   schedule:
-    # Her 6 saatte bir otomatik çalışır (UTC)
     - cron: '0 */6 * * *'
-  workflow_dispatch: # Manuel olarak başlatma butonu ekler
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -22,20 +24,29 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        # HATA DÜZELTME: aiohttp kütüphanesi eklendi
         pip install requests aiohttp
 
     - name: Run Vavoo Script
       run: |
-        # Scripti çalıştırıp çıktıyı playlist.m3u dosyasına kaydeder
-        # Not: Scriptin m3u çıktısı verecek şekilde ayarlı olması gerekir
-        python vavoo_proxy.py > playlist.m3u
+        # Scripti çalıştır ve tüm çıktıyı (hata dahil) konsola yaz
+        python vavoo_proxy.py
+        # EĞER script kendi m3u dosyasını oluşturuyorsa, alttaki satırı yorumdan çıkar (satır başındaki # kaldır)
+        # mv generated_playlist.m3u playlist.m3u
+        
+    - name: Check File Size
+      run: |
+        # Dosya gerçekten boş mu kontrol et
+        ls -lh playlist.m3u
 
     - name: Commit and Push Changes
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add playlist.m3u
-        git commit -m "Update Vavoo Playlist [$(date)]" || exit 0
+        # Dosya boşsa commit yapma ve hata ver
+        if [ ! -s playlist.m3u ]; then
+          echo "Playlist is empty, skipping commit."
+          exit 1
+        fi
+        git commit -m "Update Vavoo Playlist [$(date)]"
         git push
-        
